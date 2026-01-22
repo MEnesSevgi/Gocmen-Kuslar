@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8">
+    <title>Göçmen Kuşların Mekânsal Dağılımı</title>
+    
+
+  </head>
+    
+  <body>
+  <!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Göçmen Kuşların Mekânsal Dağılımı</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { 
+            --sky-blue: #3498db; 
+            --forest-green: #27ae60;
+            --cloud-white: #fdfdfd;
+            --night-blue: #2c3e50;
+            --wing-grey: #ecf0f1;
+        }
+        
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Segoe UI', sans-serif; background: var(--cloud-white); overflow: hidden; }
+        
+        .app-container { display: flex; flex-direction: column; height: 100vh; width: 100%; }
+        @media (min-width: 768px) { .app-container { flex-direction: row; } }
+
+        #map { flex: 1; width: 100%; z-index: 1; background: #b3e5fc; }
+
+        #info-panel { 
+            background: white; display: flex; flex-direction: column; z-index: 1000; 
+            box-shadow: -5px 0 25px rgba(0,0,0,0.1);
+        }
+
+        @media (min-width: 768px) {
+            #info-panel { width: 420px; height: 100%; border-left: 5px solid var(--sky-blue); }
+        }
+
+        @media (max-width: 767px) { #info-panel { height: 45vh; } }
+
+        .header { background: var(--night-blue); color: white; padding: 20px; text-align: center; border-bottom: 4px solid var(--forest-green); }
+        .header h1 { margin: 0; font-size: 16px; letter-spacing: 1px; font-weight: 800; text-transform: uppercase; }
+        
+        .search-area { padding: 15px; background: #fff; border-bottom: 1px solid #eee; }
+        select { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; background: #f9f9f9; }
+        
+        #content-area { padding: 25px; overflow-y: auto; flex: 1; }
+        #bird-title { margin: 0; color: var(--night-blue); font-size: 26px; font-weight: 900; }
+        
+        .bird-badge { 
+            margin: 12px 0; display: inline-flex; align-items: center; 
+            background: #e8f5e9; color: var(--forest-green); padding: 6px 14px; 
+            border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; border: 1px solid var(--forest-green);
+        }
+
+        .details-box { font-size: 15px; color: #444; line-height: 1.7; margin-top: 15px; border-left: 4px solid var(--sky-blue); padding-left: 15px; }
+
+        #bird-img { 
+            width: 100%; border-radius: 12px; margin-top: 20px; 
+            display: none; object-fit: cover; max-height: 220px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .btn { 
+            display: block; margin-top: 25px; padding: 15px; 
+            background: var(--sky-blue); color: white; 
+            text-decoration: none; text-align: center; border-radius: 8px; font-weight: bold; transition: 0.3s;
+        }
+
+        .btn:hover { background: var(--night-blue); }
+
+        .custom-marker {
+            width: 24px !important; height: 24px !important;
+            background: var(--sky-blue); border: 3px solid #fff; border-radius: 50% 50% 0 50%;
+            transform: rotate(45deg); box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .translation-info { 
+            font-size: 11px; color: #d32f2f; background: #ffebee; 
+            padding: 4px 8px; border-radius: 4px; margin-bottom: 10px; display: inline-block; font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div id="map"></div>
+    <div id="info-panel">
+        <div class="header"><h1>Göçmen Kuşların Mekânsal Dağılımı</h1></div>
+        <div class="search-area">
+            <select id="birdSelect"><option value="">Bir kuş türü seçin...</option></select>
+        </div>
+        <div id="content-area">
+            <h2 id="bird-title">Gökyüzü Yolcuları</h2>
+            <div id="type-box" style="display:none;" class="bird-badge">BÖLGE: <span id="bird-origin" style="margin-left:5px;"></span></div>
+            <img id="bird-img" src="">
+            <div id="bird-text" class="details-box">Haritadaki işaretçilere tıklayarak kuşların binlerce kilometrelik yolculuklarını ve hikayelerini keşfedin.</div>
+            <a id="wiki-link" href="#" target="_blank" class="btn" style="display:none;">BİLİMSEL DETAYLAR</a>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Kuş Veri Seti (Örnek türler)
+const birdData = [
+  { name: "Kutup Sumrusu", lat: 64.1265, lng: -21.8174, wiki: "Arctic_tern", cat: "Arktik - Antarktik", desc: "Dünyanın en uzun göçünü yapan hayvandır; her yıl kutuptan kutuba yaklaşık 70.000 km uçar." },
+  { name: "Leylek", lat: 41.0082, lng: 28.9784, wiki: "White_stork", cat: "Avrupa - Afrika", desc: "Baharın müjdeleyicisi. İstanbul Boğazı üzerinden süzülerek Afrika'ya uzanan devasa sürüler oluştururlar." },
+  { name: "Kızıl Çamurçulluğu", lat: -36.8485, lng: 174.7633, wiki: "Bar-tailed_godwit", cat: "Alaska - Yeni Zelanda", desc: "Hiç durmadan 11.000 km uçarak mola vermeden okyanusu geçen rekor sahibi bir kıyı kuşudur." },
+  { name: "Kırlangıç", lat: 51.5074, lng: -0.1278, wiki: "Barn_swallow", cat: "Küresel", desc: "Zarif kanatları ve çatallı kuyruğuyla bilinir. Kışları geçirmek için binlerce mil güneye göç ederler." },
+  { name: "Kral Kelebeği (Bonus)", lat: 19.4326, lng: -99.1332, wiki: "Monarch_butterfly", cat: "Kuzey Amerika", desc: "Kuş olmasa da kuşlar gibi göç eder; Kanada'dan Meksika'ya nesiller boyu süren bir yolculuk yapar." },
+  { name: "Küçük Akbaba", lat: 37.9838, lng: 23.7275, wiki: "Egyptian_vulture", cat: "Balkanlar - Afrika", desc: "Göç sırasında alet kullanma yeteneğiyle bilinen, nesli tehlike altında olan bilge bir tür." },
+  { name: "Sibirya Kazı", lat: 66.5001, lng: 66.7013, wiki: "Red-breasted_goose", cat: "Sibirya - Karadeniz", desc: "Dünyanın en nadir kaz türlerinden biri. Soğuk Sibirya'dan kaçıp kışın Balkanlar ve Türkiye kıyılarına gelirler." },
+  
+  { name: "Hint Kazı", lat: 28.5937, lng: 83.9315, wiki: "Bar-headed_goose", cat: "Orta Asya - Hindistan", desc: "Dünyanın en yüksekte uçan kuşlarından biridir; Himalayalar'ın üzerinden (yaklaşık 8.800 metre) aşarak göç ederler." },
+  { name: "Arı Şahini", lat: 32.7936, lng: 34.9896, wiki: "European_honey_buzzard", cat: "Avrupa - Sahra Altı Afrika", desc: "Manyetik alanları algılama yeteneğiyle navigasyon yapar. Deniz üzerinden uçmaktan kaçınarak Cebelitarık veya İstanbul Boğazı gibi dar geçitleri kullanır." },
+  { name: "Büyük Mukallit", lat: 52.5200, lng: 13.4050, wiki: "Great_reed_warbler", cat: "Avrupa - Tropikal Afrika", desc: "Gündüzleri yırtıcılardan korunmak için geceleri göç eden, küçük gövdesine rağmen devasa mesafeler kat eden bir ötücüdür." },
+  { name: "Pasifik Altın Yağmurcunu", lat: 21.3069, lng: -157.8583, wiki: "Pacific_golden_plover", cat: "Alaska - Hawaii", desc: "Alaska'dan Hawaii'ye okyanus üzerinde hiçbir kara parçası olmadan uçan, yakıt tasarrufu konusunda uzmanlaşmış bir navigasyon ustasıdır." },
+  { name: "Kara Ayaklı Albatros", lat: 28.2101, lng: -177.3761, wiki: "Black-footed_albatross", cat: "Kuzey Pasifik", desc: "Hayatının büyük kısmını açık denizlerde uçarak geçirir. Dinamik süzülme tekniği sayesinde neredeyse hiç kanat çırpmadan binlerce kilometre yol alabilir." },
+  { name: "Yelkovan", lat: 35.8989, lng: 14.5146, wiki: "Yelkouan_shearwater", cat: "Akdeniz - Karadeniz", desc: "İstanbul Boğazı'nda sürekli bir uçuş halinde görülen, suyun hemen üzerinden süzülerek besin peşinde koşan yerel göçmenlerden biridir." },
+  
+  { name: "Alaca Doğan", lat: -54.8019, lng: -68.3030, wiki: "Peregrine_falcon", cat: "Küresel (Kuzey - Güney)", desc: "Dünyanın en hızlı canlısı; kutuplardan tropiklere kadar her yıl binlerce kilometrelik dikey göç rotalarını takip eder." },
+  { name: "Mavi Yakalı Ötücü", lat: 45.5017, lng: -73.5673, wiki: "Blackpoll_warbler", cat: "Kuzey Amerika - Güney Amerika", desc: "Sadece 12 gram ağırlığında olmasına rağmen, Atlantik Okyanusu üzerinden 3 gün boyunca hiç durmadan uçabilen bir mühendislik harikasıdır." },
+  { name: "Amur Doğanı", lat: 23.8103, lng: 90.4125, wiki: "Amur_falcon", cat: "Sibirya - Güney Afrika", desc: "Açık denizi (Hint Okyanusu) en uzun mesafede geçen yırtıcıdır; Doğu Asya'dan yola çıkıp Güney Afrika'ya kadar gider." },
+  { name: "Büyük Orman Kartalı", lat: 52.2297, lng: 21.0122, wiki: "Greater_spotted_eagle", cat: "Kuzey Avrupa - Orta Doğu", desc: "Ormanlık alanları tercih eden ve göç yolunda sulak alanları stratejik durak olarak kullanan görkemli bir avcı." },
+  { name: "Yakalı Çayırkuşu", lat: 49.8951, lng: -97.1384, wiki: "Bobolink", cat: "Kuzey Amerika - Arjantin", desc: "Yıldızların konumunu ve yerçekimini hissederek yön bulan, her yıl yaklaşık 20.000 km yol kat eden bir gezgindir." },
+  { name: "Flamingo", lat: 36.6667, lng: 34.0000, wiki: "Greater_flamingo", cat: "Akdeniz - Afrika", desc: "Düzenli bir rota izlemek yerine su kaynaklarının durumuna göre göç eden, sosyal ve estetik bir göçmen türü." },
+  { name: "Gri Başlı Albatros", lat: -54.0000, lng: -38.0000, wiki: "Grey-headed_albatross", cat: "Antarktika Çevresi", desc: "Dünya etrafındaki tam turunu rüzgarları kullanarak 46 günde tamamlayabilen, durdurulamaz bir fırtına kuşudur." }
+  
+  
+];
+
+const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_labels_under/{z}/{x}/{y}{r}.png').addTo(map);
+
+const select = document.getElementById('birdSelect');
+
+birdData.forEach(item => {
+    const m = L.marker([item.lat, item.lng], { 
+        icon: L.divIcon({ className: 'custom-marker' }) 
+    }).addTo(map);
+    
+    const opt = document.createElement('option');
+    opt.value = item.name; 
+    opt.textContent = `${item.cat} | ${item.name}`;
+    select.appendChild(opt);
+    
+    m.on('click', () => { updatePanel(item); map.flyTo([item.lat, item.lng], 6); });
+});
+
+select.onchange = (e) => {
+    const item = birdData.find(d => d.name === e.target.value);
+    if (item) { updatePanel(item); map.flyTo([item.lat, item.lng], 6); }
+};
+
+async function translateText(text) {
+    try {
+        const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=tr&dt=t&q=${encodeURIComponent(text)}`);
+        const data = await res.json();
+        return data[0].map(item => item[0]).join('');
+    } catch (error) { return text; }
+}
+
+async function updatePanel(item) {
+    const titleEl = document.getElementById('bird-title');
+    const typeBox = document.getElementById('type-box');
+    const originName = document.getElementById('bird-origin');
+    const textEl = document.getElementById('bird-text');
+    const imgEl = document.getElementById('bird-img');
+    const linkEl = document.getElementById('wiki-link');
+
+    titleEl.textContent = item.name;
+    typeBox.style.display = 'inline-flex';
+    originName.textContent = item.cat;
+    textEl.innerHTML = `<strong>Göç Hikayesi:</strong> ${item.desc}<br><br><span id="summary">Veriler gökyüzünden indiriliyor...</span>`;
+    imgEl.style.display = 'none';
+    linkEl.style.display = 'none';
+
+    try {
+        let res = await fetch(`https://tr.wikipedia.org/api/rest_v1/page/summary/${item.wiki}`);
+        let data = await res.json();
+
+        if (data.title && data.extract && data.type !== 'disambiguation') {
+            displayWikiData(data, false);
+        } else {
+            throw new Error();
+        }
+    } catch (e) {
+        try {
+            let res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${item.wiki}`);
+            let data = await res.json();
+
+            if (data.extract) {
+                const translated = await translateText(data.extract);
+                data.extract = translated;
+                displayWikiData(data, true);
+            } else {
+                document.getElementById('summary').textContent = "Bu tür hakkında detaylı bilgi bulunamadı.";
+            }
+        } catch (err) {
+            document.getElementById('summary').textContent = "Bilgiye şu an ulaşılamıyor.";
+        }
+    }
+
+    function displayWikiData(data, isTranslated) {
+        const summaryEl = document.getElementById('summary');
+        summaryEl.innerHTML = (isTranslated ? '<span class="translation-info">ℹ️ Çeviri İçerik</span><br>' : '') + data.extract;
+        if (data.thumbnail) { imgEl.src = data.thumbnail.source; imgEl.style.display = 'block'; }
+        if (data.content_urls) { 
+            linkEl.href = data.content_urls.desktop.page; 
+            linkEl.style.display = 'block'; 
+            linkEl.textContent = "DAHA FAZLA BİLGİ";
+        }
+    }
+}
+</script>
+</body>
+</html>
+    
+  </body>
+  
+</html>
